@@ -27,49 +27,74 @@ export class TelegramService implements OnModuleInit {
 
     // Команда /start: Инициализация пользователя и показ главного меню
     this.bot.start(async (ctx) => {
-      const { id, username, first_name, last_name } = ctx.from;
-
-      this.logger.log(`Received /start command from user: ${username} (${id})`);
-
-      try {
-        const user = await this.usersService.createOrUpdateUser({
-          telegramId: id,
-          username,
-          firstName: first_name,
-          lastName: last_name,
-        });
-
-        if (!user) {
-          this.logger.error(`Failed to create or update user: ${username} (${id})`);
+        const { id, username, first_name, last_name } = ctx.from;
+      
+        this.logger.log(`Received /start command from user: ${username} (${id})`);
+      
+        try {
+          const user = await this.usersService.createOrUpdateUser({
+            telegramId: id,
+            username,
+            firstName: first_name,
+            lastName: last_name,
+          });
+      
+          if (!user) {
+            this.logger.error(`Failed to create or update user: ${username} (${id})`);
+            ctx.reply('An error occurred while processing your request.');
+          } else {
+            this.logger.log(`User ${username} (${id}) successfully created or updated in the database: ${JSON.stringify(user)}`);
+      
+            // Отправляем картинку с приветствием
+            await ctx.replyWithPhoto(
+              'https://fanday.net/img/news/CASINO/free-spins.webp', // URL картинки
+              {
+                caption: 'Welcome to Casino Free Games Bot! Choose a category games:', // Текст под картинкой
+              },
+            );
+      
+            // Отображаем главное меню
+            ctx.reply('Choose a category:', this.getMainMenuKeyboard());
+          }
+        } catch (error) {
+          this.logger.error(`Error creating or updating user ${username} (${id}): ${error.message}`, error.stack);
           ctx.reply('An error occurred while processing your request.');
-        } else {
-          this.logger.log(`User ${username} (${id}) successfully created or updated in the database: ${JSON.stringify(user)}`);
-          ctx.reply(
-            'Welcome to Casino Free Games Bot! Choose a category:',
-            this.getMainMenuKeyboard(),
-          );
         }
-      } catch (error) {
-        this.logger.error(`Error creating or updating user ${username} (${id}): ${error.message}`, error.stack);
-        ctx.reply('An error occurred while processing your request.');
-      }
-    });
+      });
 
     // Обработчик выбора категории через Reply Keyboard
     this.bot.hears(['Spin of Thrones III', 'Popular', 'Exclusive', 'Best in South Korea', 'Drops & Wins'], async (ctx) => {
-      const categoryName = ctx.message.text;
-      this.logger.log(`Category selected: ${categoryName}`);
-
-      const categoryId = this.getCategoryIdByName(categoryName);
-      const games = await this.gamesService.findByParentId(categoryId);
-
-      if (games.length === 0) {
-        ctx.reply('No games in this category yet.', this.getMainMenuKeyboard());
-        return;
-      }
-
-      ctx.reply('Select a game:', this.getGamesKeyboard(games));
-    });
+        const categoryName = ctx.message.text;
+        this.logger.log(`Category selected: ${categoryName}`);
+      
+        const categoryId = this.getCategoryIdByName(categoryName);
+        const games = await this.gamesService.findByParentId(categoryId);
+      
+        // Картинка для категории
+        const categoryImages = {
+          'Spin of Thrones III': 'https://thenewdawnliberia.com/storage/2024/09/bettt.jpeg',
+          'Popular': 'https://example.com/popular.jpg',
+          'Exclusive': 'https://example.com/exclusive.jpg',
+          'Best in South Korea': 'https://example.com/korea.jpg',
+          'Drops & Wins': 'https://example.com/drops.jpg',
+        };
+      
+        const categoryImage = categoryImages[categoryName];
+      
+        // Отправляем картинку для выбранной категории
+        if (categoryImage) {
+          await ctx.replyWithPhoto(categoryImage, {
+            caption: `You selected the category: ${categoryName}`,
+          });
+        }
+      
+        if (games.length === 0) {
+          ctx.reply('No games in this category yet.', this.getMainMenuKeyboard());
+          return;
+        }
+      
+        ctx.reply('Select a game:', this.getGamesKeyboard(games));
+      });
 
     // Обработчик выбора игры через Reply Keyboard
     this.bot.hears(/.+/, (ctx) => {
